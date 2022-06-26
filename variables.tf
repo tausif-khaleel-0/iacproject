@@ -26,3 +26,13 @@ variable "secrets_manager_access" {
     type = bool
     default = true
 }
+
+variable "aws_partition" {
+    description = "AWS partition (aws / aws-cn / aws-us-gov)"
+    type = string
+    default = "aws"
+    validation {
+    condition     = contains(["aws", "aws-cn", "aws-us-gov"], var.aws_partition)
+    error_message = "Allowed values for aws_partition are \"aws\", \"aws-cn\", or \"aws-us-gov\"."
+  }
+}

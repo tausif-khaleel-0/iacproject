@@ -1,5 +1,5 @@
 locals {
-  policy_filename   = var.policy_type == "saas" ? "client_policy.json" : "client_to_orca_policy.json"
+  policy_filename   = var.policy_type == "saas" ? "saas/client_policy.json.tpl" : "scanneraccount/client_to_orca_policy.json.tpl"
   policy_name       = var.policy_type == "saas" ? "OrcaSecurityPolicy" : "OrcaSecurityPolicySA"
   role_name         = var.policy_type == "saas" ? "OrcaSecurityRole"   : "OrcaSecurityRoleSA"
 }
@@ -29,16 +29,22 @@ resource "aws_iam_role" "role" {
 }
 
 resource "aws_iam_policy" "policy" {
-  policy      = file("${path.module}/${local.policy_filename}")
+  policy      = templatefile("${path.module}/policies/${local.policy_filename}", { partition = var.aws_partition })
   name        = local.policy_name
   description = "Orca Security Account Policy"
+}
+
+resource "aws_iam_policy" "view_only_extras_policy" {
+  policy      = file("${path.module}/policies/view_only_extras_policy.json")
+  name        = "OrcaSecurityViewOnlyExtrasPolicy"
+  description = "Orca Security Extras For View Only Policy"
 }
 
 resource "aws_iam_policy" "secrets_manager_policy" {
   count       = var.secrets_manager_access ? 1 : 0
   name        = "OrcaSecuritySecretsManagerPolicy"
   description = "Orca Security Secrets Manager Policy"
-  policy      = file("${path.module}/client_secrets_manager_policy.json")
+  policy      = file("${path.module}/policies/client_secrets_manager_policy.json")
 }
 
 resource "aws_iam_role_policy_attachment" "orca-attach" {
@@ -46,9 +52,14 @@ resource "aws_iam_role_policy_attachment" "orca-attach" {
   policy_arn  = aws_iam_policy.policy.arn
 }
 
-resource "aws_iam_role_policy_attachment" "attach_read_only" {
+resource "aws_iam_role_policy_attachment" "attach_view_only" {
   role        = aws_iam_role.role.name
-  policy_arn  = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+  policy_arn  = "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "attach_view_only_extras" {
+  role        = aws_iam_role.role.name
+  policy_arn  = aws_iam_policy.view_only_extras_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "attach_secrets_manager_access" {
@@ -84,7 +95,7 @@ resource "aws_iam_policy" "inaccount-scanner-client" {
   count       = var.policy_type == "inaccount" ? 1 : 0
   name        = "OrcaSecuritySideScannerPolicy"
   description = "Orca Security Side Scanner Policy"
-  policy      = file("${path.module}/client_to_scanner_policy.json")
+  policy      = templatefile("${path.module}/policies/scanneraccount/client_to_scanner_policy.json.tpl", { partition = var.aws_partition })
 }
 
 resource "aws_iam_role_policy_attachment" "inaccount-scanner-client" {
